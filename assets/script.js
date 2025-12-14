@@ -133,10 +133,32 @@ down.onclick = () => { pos.y += MOVE; draw(); };
 
 // ====== DOWNLOAD ======
 saveImage.onclick = () => {
-  const link = document.createElement('a');
-  link.download = 'twibbon.png';
-  link.href = canvas.toDataURL();
-  link.click();
+    const canvas = document.getElementById('canvas'); 
+
+    if (!canvas) {
+        console.error("Canvas element not found.");
+        return;
+    }
+
+    canvas.toBlob((blob) => {
+        if (!blob) {
+            alert('Gagal membuat gambar untuk diunduh.');
+            return;
+        }
+
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement('a');
+        link.download = 'jkt48twibbon.png'; 
+        link.href = url;
+
+        document.body.appendChild(link);
+        link.click();
+
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+    }, 'image/png');
 };
 
 // INIT
