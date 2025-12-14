@@ -94,19 +94,23 @@ $(document).ready(() => {
                     class="twibbon-item bg-gray-700/50 p-2 rounded-lg cursor-pointer transition hover:bg-gray-700 ${i === 0 ? 'active border-2 border-primary' : ''}" 
                     data-src="${t.file}"
                 >
-                    <img src="${t.file}" class="w-full h-auto rounded">
+                    <img 
+                        src="${t.file}" 
+                        class="w-full h-auto rounded"
+                        loading="${i === 0 ? 'eager' : 'lazy'}"  
+                        alt="${t.name}"
+                    >
                     <small class="block text-center text-xs mt-1 text-text-muted">${t.name}</small>
                 </div>
             </div>
         `).join('');
         
         $twibbonGrid.html(gridHtml);
+        
         loadTwibbon(twibbonList[0].file);
     };
 
-
     // === EVENT LISTENERS ===
-
     $twibbonGrid.on('click', '.twibbon-item', function() {
         const src = $(this).data('src'); 
         loadTwibbon(src);
