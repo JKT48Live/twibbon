@@ -1,11 +1,15 @@
 $(document).ready(() => {
     const $canvas = $('#canvas');
     const canvas = $canvas[0]; 
-    
-    const ctx = canvas.getContext('2d', { 
-        alpha: true,
-        willReadFrequently: true
-    });
+
+    const getBestContext = (targetCanvas) => (
+        targetCanvas.getContext('2d', {
+            alpha: true,
+            willReadFrequently: true
+        })
+    );
+
+    const ctx = getBestContext(canvas);
 
     const $zoomControl = $('#zoomControl');
     const $left = $('#left');
@@ -15,23 +19,27 @@ $(document).ready(() => {
     const $saveImage = $('#saveImage');
     const $imageUpload = $('#imageUpload');
     const $twibbonGrid = $('#twibbonGrid');
+    const $canvasContainer = $('#canvasContainer');
 
     // === STATE VARIABLES ===
     let image = new Image();
     let twibbon = new Image();
+    let imageObjectUrl = null;
 
     let scale = 1;
     let pos = { x: 0, y: 0 };
     let isDragging = false;
     let dragStart = { x: 0, y: 0 };
     const MOVE = 10;
+    const EXPORT_SCALE = 1;
 
     // ====== TWIBBON LIST ======
     const twibbonList = [
-        { name: "First Snow", file: "twibbon/first-snow.png" },
-        { name: "Wonderland", file: "twibbon/Twibbon-Wonderland.png" },
         { name: "Hagavi JKT48V", file: "twibbon/Hagavi_JKT48V.png" },
-        { name: "Flowerful", file: "twibbon/flowerful.png" },
+        { name: "First Snow Concert", file: "twibbon/first-snow.png" },
+        { name: "Wonderland Concert", file: "twibbon/Twibbon-Wonderland.png" },
+        { name: "Flowerful Concert", file: "twibbon/flowerful.png" },
+        { name: "Kabesha Frame (web)", file: "twibbon/memberFrame.png" },
         { name: "Team Passion", file: "twibbon/passion.png" },
         { name: "Team Dream", file: "twibbon/TeamDream.png" },
     ];
@@ -45,24 +53,29 @@ $(document).ready(() => {
         draw();
     };
 
-    const draw = () => {
+    const renderComposite = (targetCtx, targetCanvasWidth, targetCanvasHeight) => {
         if (!twibbon.complete) return;
-
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+        targetCtx.clearRect(0, 0, targetCanvasWidth, targetCanvasHeight);
+        targetCtx.imageSmoothingEnabled = true;
+        targetCtx.imageSmoothingQuality = 'high';
+        targetCtx.globalCompositeOperation = 'source-over';
+        targetCtx.filter = 'none';
+        
         if (image.complete && image.src) {
+            const widthRatio = targetCanvasWidth / canvas.width;
+            const heightRatio = targetCanvasHeight / canvas.height;
             const baseSf = Math.max(
-                canvas.width / image.width,
-                canvas.height / image.height
+                targetCanvasWidth / image.width,
+                targetCanvasHeight / image.height
             );
             
             const finalSf = baseSf * scale;
             const scaledWidth = image.width * finalSf;
             const scaledHeight = image.height * finalSf;
-            const offsetX = (canvas.width - scaledWidth) / 2 + pos.x;
-            const offsetY = (canvas.height - scaledHeight) / 2 + pos.y;
+            const offsetX = (targetCanvasWidth - scaledWidth) / 2 + (pos.x * widthRatio);
+            const offsetY = (targetCanvasHeight - scaledHeight) / 2 + (pos.y * heightRatio);
 
-            ctx.drawImage(
+            targetCtx.drawImage(
                 image, 
                 offsetX, 
                 offsetY, 
@@ -71,7 +84,12 @@ $(document).ready(() => {
             );
         }
 
-        ctx.drawImage(twibbon, 0, 0, canvas.width, canvas.height);
+        targetCtx.drawImage(twibbon, 0, 0, targetCanvasWidth, targetCanvasHeight);
+    };
+
+    const draw = () => {
+        if (!twibbon.complete) return;
+        renderComposite(ctx, canvas.width, canvas.height);
     };
 
     const loadTwibbon = (src) => {
@@ -83,26 +101,26 @@ $(document).ready(() => {
         };
         twibbon.src = src;
 
-        $('.twibbon-item').removeClass('active border-2 border-primary');
-        $(`[data-src="${src}"]`).addClass('active border-2 border-primary');
+        $('.twibbon-item').removeClass('active');
+        $(`[data-src="${src}"]`).addClass('active');
     };
 
 
     // ====== RENDER GRID ======
     const renderGrid = () => {
         const gridHtml = twibbonList.map((t, i) => `
-            <div class="p-2 sm:p-0">
+            <div class="p-1">
                 <div 
-                    class="twibbon-item bg-gray-700/50 p-2 rounded-lg cursor-pointer transition hover:bg-gray-700 ${i === 0 ? 'active border-2 border-primary' : ''}" 
+                    class="twibbon-item rounded-2xl p-2 cursor-pointer ${i === 0 ? 'active' : ''}" 
                     data-src="${t.file}"
                 >
                     <img 
                         src="${t.file}" 
-                        class="w-full h-auto rounded"
+                        class="w-full h-auto rounded-xl"
                         loading="${i === 0 ? 'eager' : 'lazy'}"  
                         alt="${t.name}"
                     >
-                    <small class="block text-center text-xs mt-1 text-text-muted">${t.name}</small>
+                    <small class="mt-2 block text-center text-xs font-medium text-textMuted">${t.name}</small>
                 </div>
             </div>
         `).join('');
@@ -118,31 +136,59 @@ $(document).ready(() => {
         loadTwibbon(src);
     });
 
+    const revokeImageObjectUrl = () => {
+        if (imageObjectUrl) {
+            URL.revokeObjectURL(imageObjectUrl);
+            imageObjectUrl = null;
+        }
+    };
+
+    const loadUserImage = (file) => {
+        revokeImageObjectUrl();
+        image = new Image();
+        image.decoding = 'async';
+        image.crossOrigin = 'anonymous';
+
+        const objectUrl = URL.createObjectURL(file);
+        imageObjectUrl = objectUrl;
+
+        image.onload = reset;
+        image.src = objectUrl;
+    };
+
     $imageUpload.on('change', function(e) {
         const file = e.target.files[0];
         if (!file) return;
+        $('#file-name').text(file.name);
 
-        const reader = new FileReader();
-        reader.onload = ev => {
-            image = new Image();
-            image.onload = reset;
-            image.src = ev.target.result;
-        };
-        reader.readAsDataURL(file);
+        loadUserImage(file);
     });
 
+    const getCanvasPointer = (event) => {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+
+        return {
+            x: (event.clientX - rect.left) * scaleX,
+            y: (event.clientY - rect.top) * scaleY,
+        };
+    };
+
     $canvas.on('mousedown', (e) => {
+        const pointer = getCanvasPointer(e);
         isDragging = true;
         dragStart = {
-            x: e.offsetX - pos.x,
-            y: e.offsetY - pos.y
+            x: pointer.x - pos.x,
+            y: pointer.y - pos.y
         };
     });
 
     $canvas.on('mousemove', (e) => {
         if (!isDragging) return;
-        pos.x = e.offsetX - dragStart.x;
-        pos.y = e.offsetY - dragStart.y;
+        const pointer = getCanvasPointer(e);
+        pos.x = pointer.x - dragStart.x;
+        pos.y = pointer.y - dragStart.y;
         draw();
     });
 
@@ -178,10 +224,19 @@ $(document).ready(() => {
             return;
         }
 
-        const MIME_TYPE = 'image/png';
-        const QUALITY = 1.0;
+        const exportCanvas = document.createElement('canvas');
+        exportCanvas.width = Math.round(canvas.width * EXPORT_SCALE);
+        exportCanvas.height = Math.round(canvas.height * EXPORT_SCALE);
+        const exportCtx = getBestContext(exportCanvas);
 
-        canvas.toBlob((blob) => {
+        if (!exportCtx) {
+            alert('Gagal menyiapkan canvas export.');
+            return;
+        }
+
+        renderComposite(exportCtx, exportCanvas.width, exportCanvas.height);
+
+        exportCanvas.toBlob((blob) => {
             if (!blob) {
                 alert('Gagal membuat gambar untuk diunduh.');
                 return;
@@ -199,7 +254,7 @@ $(document).ready(() => {
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
 
-        }, MIME_TYPE, QUALITY);
+        }, 'image/png', 1.0);
     });
 
     // === INITIATION ===
