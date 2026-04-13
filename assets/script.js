@@ -33,6 +33,7 @@ $(document).ready(() => {
         { name: "Hagavi JKT48V", file: "twibbon/Hagavi_JKT48V.png" },
         { name: "Flowerful", file: "twibbon/flowerful.png" },
         { name: "Team Passion", file: "twibbon/passion.png" },
+        { name: "Team Dream", file: "twibbon/TeamDream.png" },
     ];
 
     // === CORE FUNCTIONS ===
