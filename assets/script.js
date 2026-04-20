@@ -42,6 +42,7 @@ $(document).ready(() => {
         { name: "Kabesha Frame (web)", file: "twibbon/memberFrame.png" },
         { name: "Team Passion", file: "twibbon/passion.png" },
         { name: "Team Dream", file: "twibbon/TeamDream.png" },
+        { name: "Team Love", file: "twibbon/teamlove.png" },
     ];
 
     // === CORE FUNCTIONS ===
